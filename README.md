@@ -1,1 +1,1 @@
-# mirzoev224-rgb.github.io
+just shit project with claude
