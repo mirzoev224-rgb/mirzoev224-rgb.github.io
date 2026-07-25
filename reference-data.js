@@ -7,7 +7,6 @@ window.ReferenceData = (function () {
   const AIRLINES_URL = "https://api.travelpayouts.com/data/ru/airlines.json";
 
   // Переводит двухбуквенный ISO-код страны в эмодзи-флаг.
-  // Приём: буквы A-Z сдвигаются в диапазон региональных индикаторов Юникода.
   function countryCodeToFlag(countryCode) {
     if (!countryCode || countryCode.length !== 2) return "";
     const OFFSET = 127397; // 0x1F1E6 - 'A'.charCodeAt(0)
@@ -17,6 +16,29 @@ window.ReferenceData = (function () {
         .split("")
         .map((c) => c.charCodeAt(0) + OFFSET)
     );
+  }
+
+  // Пытается получить JSON напрямую; если браузер блокирует запрос (CORS) -
+  // пробует через публичный прокси allorigins.win. Логирует в консоль, чтобы
+  // при отладке было видно, что именно произошло.
+  async function fetchJsonWithCorsFallback(url, label) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return null;
+      return await response.json();
+    } catch (err) {
+      console.warn(`[${label}] прямой запрос не прошёл (похоже на CORS), пробую через прокси`, err);
+    }
+
+    try {
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const response = await fetch(proxyUrl);
+      if (!response.ok) return null;
+      return await response.json();
+    } catch (proxyErr) {
+      console.error(`[${label}] и прокси тоже не сработал`, proxyErr);
+      return null;
+    }
   }
 
   // Поиск городов по названию (любой язык, любая часть слова).
@@ -30,21 +52,10 @@ window.ReferenceData = (function () {
     params.append("types[]", "city");
     params.append("types[]", "airport");
 
-    let response;
-    try {
-      response = await fetch(`${AUTOCOMPLETE_URL}?${params.toString()}`);
-    } catch (err) {
-      return []; // тихо ничего не предлагаем, если сервис недоступен
-    }
-
-    if (!response.ok) return [];
-
-    let data;
-    try {
-      data = await response.json();
-    } catch (err) {
-      return [];
-    }
+    const data = await fetchJsonWithCorsFallback(
+      `${AUTOCOMPLETE_URL}?${params.toString()}`,
+      "автокомплит городов"
+    );
 
     if (!Array.isArray(data)) return [];
 
@@ -69,18 +80,14 @@ window.ReferenceData = (function () {
     if (airlinesCache) return airlinesCache;
     if (airlinesLoadingPromise) return airlinesLoadingPromise;
 
-    airlinesLoadingPromise = fetch(AIRLINES_URL)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((list) => {
+    airlinesLoadingPromise = fetchJsonWithCorsFallback(AIRLINES_URL, "справочник авиакомпаний").then(
+      (list) => {
         airlinesCache = Array.isArray(list)
           ? list.filter((a) => a.iata && a.name)
           : [];
         return airlinesCache;
-      })
-      .catch(() => {
-        airlinesCache = [];
-        return airlinesCache;
-      });
+      }
+    );
 
     return airlinesLoadingPromise;
   }

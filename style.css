@@ -7,7 +7,7 @@
   --accent: #3ddc97;
   --accent-dim: #2a9d70;
   --danger: #ff6b6b;
-  --border: #2a323b;
+  --border: #6a727a;
   --radius: 10px;
 }
 
@@ -190,13 +190,29 @@ select {
   background: var(--surface);
 }
 
+.suggestion-item-active {
+  background: var(--surface);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.ticket-card:focus-visible,
+.suggestion-item:focus-visible,
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .suggestion-flag {
   margin-right: 6px;
 }
 
 .swap-btn {
   height: 46px;
-  width: 40px;
+  width: 44px;
+  min-width: 44px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -208,16 +224,22 @@ select {
 .checkbox-field {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 0;
 }
 
 .checkbox-field label {
   margin-bottom: 0;
+  cursor: pointer;
+  padding: 8px 0;
 }
 
 .checkbox-field input {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  cursor: pointer;
 }
 
 .filters-block {

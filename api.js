@@ -20,6 +20,10 @@ window.FlightAPI = (function () {
   }
 
   // Один запрос к prices_for_dates на конкретную дату вылета.
+  // Travelpayouts Data API не всегда отдаёт CORS-заголовки для прямых браузерных
+  // запросов - если прямой fetch падает с сетевой ошибкой (что часто на самом деле
+  // означает блокировку CORS, а не реальное отсутствие интернета), пробуем ещё раз
+  // через публичный CORS-прокси allorigins.win.
   async function fetchForDate({ origin, destination, departureDate, directOnly }) {
     const params = new URLSearchParams({
       origin: origin.toUpperCase(),
@@ -36,16 +40,49 @@ window.FlightAPI = (function () {
 
     const url = `${API_BASE}/aviasales/v3/prices_for_dates?${params.toString()}`;
 
-    let response;
-    try {
-      response = await fetch(url);
-    } catch (networkErr) {
-      throw new ApiError(
-        "network",
-        "Нет соединения с сервером. Проверь интернет и попробуй снова."
-      );
+    const data = await fetchJsonWithCorsFallback(url);
+
+    if (!data || data.success === false) {
+      throw new ApiError("server", "Сервер не смог обработать запрос.");
     }
 
+    return Array.isArray(data.data) ? data.data : [];
+  }
+
+  // Пытается получить JSON напрямую; если браузер блокирует запрос (CORS) или
+  // реально нет сети - пробует через прокси. Различает типы ошибок, чтобы
+  // показать пользователю осмысленное сообщение, а не универсальное "нет интернета".
+  async function fetchJsonWithCorsFallback(url) {
+    let directFailed = false;
+
+    try {
+      const response = await fetch(url);
+      return await handleResponse(response);
+    } catch (err) {
+      if (err instanceof ApiError) throw err; // это уже осмысленная ошибка (401/500 и т.п.)
+      directFailed = true; // fetch() бросил TypeError - похоже на CORS или обрыв сети
+    }
+
+    // Запасной путь - через публичный CORS-прокси.
+    try {
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const response = await fetch(proxyUrl);
+      return await handleResponse(response);
+    } catch (proxyErr) {
+      if (proxyErr instanceof ApiError) throw proxyErr;
+      // Оба пути упали - тут уже правда похоже на реальное отсутствие сети,
+      // либо прокси тоже недоступен.
+      console.error("Прямой запрос и запрос через прокси оба провалились:", proxyErr);
+      throw new ApiError(
+        "network",
+        directFailed
+          ? "Не удалось связаться с сервером цен (возможна блокировка запроса браузером). Проверь интернет; если он есть - открой консоль браузера (⋮ → Ещё инструменты → Инструменты разработчика) и посмотри, нет ли ошибки CORS."
+          : "Нет соединения с сервером. Проверь интернет и попробуй снова."
+      );
+    }
+  }
+
+  async function handleResponse(response) {
     if (response.status === 401 || response.status === 403) {
       throw new ApiError(
         "auth",
@@ -60,13 +97,11 @@ window.FlightAPI = (function () {
       );
     }
 
-    const data = await response.json();
-
-    if (!data || data.success === false) {
-      throw new ApiError("server", "Сервер не смог обработать запрос.");
+    try {
+      return await response.json();
+    } catch (err) {
+      throw new ApiError("server", "Сервер прислал непонятный ответ.");
     }
-
-    return Array.isArray(data.data) ? data.data : [];
   }
 
   // Поиск с опциональным разбросом дат ±3 дня.

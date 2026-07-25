@@ -28,6 +28,15 @@
     return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" });
   }
 
+  function openTicket(ticket) {
+    const url = window.FlightAPI.buildBookingUrl(
+      ticket,
+      window.__lastSearch.originCode,
+      window.__lastSearch.destinationCode
+    );
+    window.open(url, "_blank");
+  }
+
   function renderResults(tickets, originLabel, destinationLabel) {
     const list = document.getElementById("results-list");
     const empty = document.getElementById("results-empty");
@@ -47,6 +56,13 @@
     tickets.forEach((ticket) => {
       const li = document.createElement("li");
       li.className = "ticket-card";
+      // Доступность с клавиатуры: карточка ведёт себя как кнопка.
+      li.setAttribute("role", "button");
+      li.setAttribute("tabindex", "0");
+      li.setAttribute(
+        "aria-label",
+        `${originLabel} в ${destinationLabel}, ${ticket.price} ${window.APP_CONFIG.CURRENCY.toUpperCase()}, открыть для покупки`
+      );
 
       const transferLabel =
         ticket.transfers === 0
@@ -65,13 +81,12 @@
         </div>
       `;
 
-      li.addEventListener("click", () => {
-        const url = window.FlightAPI.buildBookingUrl(
-          ticket,
-          window.__lastSearch.originCode,
-          window.__lastSearch.destinationCode
-        );
-        window.open(url, "_blank");
+      li.addEventListener("click", () => openTicket(ticket));
+      li.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openTicket(ticket);
+        }
       });
 
       list.appendChild(li);
@@ -121,6 +136,9 @@
   }
 
   // ---------- Автокомплит (города и авиакомпании) ----------
+  // Реализован как упрощённый ARIA combobox: role="combobox" на input +
+  // role="listbox"/role="option" на подсказках, доступно с клавиатуры
+  // (стрелки, Enter, Escape), не только мышью/тапом.
 
   function debounce(fn, delay) {
     let timer = null;
@@ -130,108 +148,160 @@
     };
   }
 
-  function setupCityAutocomplete(inputId, suggestionsId, flagId) {
+  function setupAutocomplete({ inputId, suggestionsId, flagId, fetchFn, renderLabel, onSelect }) {
     const input = document.getElementById(inputId);
     const list = document.getElementById(suggestionsId);
     const flagEl = flagId ? document.getElementById(flagId) : null;
 
     input.dataset.code = "";
+    let activeIndex = -1;
+    let currentResults = [];
 
-    const runSearchDebounced = debounce(async (term) => {
-      const results = await window.ReferenceData.searchCities(term);
-      renderCitySuggestions(results);
-    }, 300);
-
-    function renderCitySuggestions(results) {
+    function closeList() {
+      list.classList.add("hidden");
       list.innerHTML = "";
+      input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant");
+      activeIndex = -1;
+      currentResults = [];
+    }
+
+    function selectItem(item) {
+      onSelect(item, input, flagEl);
+      closeList();
+    }
+
+    function renderSuggestions(results) {
+      currentResults = results;
+      activeIndex = -1;
+      list.innerHTML = "";
+
       if (!results.length) {
-        list.classList.add("hidden");
+        closeList();
         return;
       }
-      results.forEach((item) => {
+
+      results.forEach((item, index) => {
         const li = document.createElement("li");
         li.className = "suggestion-item";
-        li.innerHTML = `<span class="suggestion-flag">${item.flag}</span> ${item.name}${
-          item.countryName ? `, ${item.countryName}` : ""
-        }`;
-        li.addEventListener("click", () => {
-          input.value = item.name;
-          input.dataset.code = item.code;
-          input.dataset.label = item.name;
-          if (flagEl) flagEl.textContent = item.flag;
-          list.classList.add("hidden");
+        li.id = `${suggestionsId}-option-${index}`;
+        li.setAttribute("role", "option");
+        li.setAttribute("tabindex", "-1");
+        li.innerHTML = renderLabel(item);
+
+        li.addEventListener("mousedown", (e) => {
+          // mousedown, а не click - чтобы сработать раньше blur у инпута.
+          e.preventDefault();
+          selectItem(item);
         });
+
         list.appendChild(li);
       });
+
       list.classList.remove("hidden");
+      input.setAttribute("aria-expanded", "true");
     }
+
+    function setActive(index) {
+      const items = list.querySelectorAll(".suggestion-item");
+      items.forEach((el) => el.classList.remove("suggestion-item-active"));
+      if (index >= 0 && index < items.length) {
+        items[index].classList.add("suggestion-item-active");
+        items[index].scrollIntoView({ block: "nearest" });
+        input.setAttribute("aria-activedescendant", items[index].id);
+        activeIndex = index;
+      } else {
+        input.removeAttribute("aria-activedescendant");
+        activeIndex = -1;
+      }
+    }
+
+    const runSearchDebounced = debounce(async (term) => {
+      const results = await fetchFn(term);
+      renderSuggestions(results);
+    }, 300);
 
     input.addEventListener("input", () => {
       input.dataset.code = "";
       if (flagEl) flagEl.textContent = "";
       const term = input.value;
       if (term.trim().length < 2) {
-        list.classList.add("hidden");
+        closeList();
         return;
       }
       runSearchDebounced(term);
     });
 
-    input.addEventListener("blur", () => {
-      // Небольшая задержка, чтобы клик по подсказке успел сработать до скрытия списка.
-      setTimeout(() => list.classList.add("hidden"), 150);
-    });
-  }
+    input.addEventListener("keydown", (e) => {
+      if (list.classList.contains("hidden")) return;
 
-  function setupAirlineAutocomplete(inputId, suggestionsId) {
-    const input = document.getElementById(inputId);
-    const list = document.getElementById(suggestionsId);
-
-    input.dataset.code = "";
-
-    const runSearchDebounced = debounce(async (term) => {
-      const results = await window.ReferenceData.searchAirlines(term);
-      renderAirlineSuggestions(results);
-    }, 300);
-
-    function renderAirlineSuggestions(results) {
-      list.innerHTML = "";
-      if (!results.length) {
-        list.classList.add("hidden");
-        return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActive(Math.min(activeIndex + 1, currentResults.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActive(Math.max(activeIndex - 1, 0));
+      } else if (e.key === "Enter") {
+        if (activeIndex >= 0 && currentResults[activeIndex]) {
+          e.preventDefault();
+          selectItem(currentResults[activeIndex]);
+        }
+      } else if (e.key === "Escape") {
+        closeList();
       }
-      results.forEach((item) => {
-        const li = document.createElement("li");
-        li.className = "suggestion-item";
-        li.textContent = item.name;
-        li.addEventListener("click", () => {
-          input.value = item.name;
-          input.dataset.code = item.code;
-          list.classList.add("hidden");
-        });
-        list.appendChild(li);
-      });
-      list.classList.remove("hidden");
-    }
-
-    input.addEventListener("input", () => {
-      input.dataset.code = "";
-      const term = input.value;
-      if (term.trim().length < 2) {
-        list.classList.add("hidden");
-        return;
-      }
-      runSearchDebounced(term);
     });
 
     input.addEventListener("blur", () => {
-      setTimeout(() => list.classList.add("hidden"), 150);
+      // Небольшая задержка не нужна: выбор идёт через mousedown (срабатывает раньше blur).
+      closeList();
     });
   }
 
-  setupCityAutocomplete("origin", "origin-suggestions", "origin-flag");
-  setupCityAutocomplete("destination", "destination-suggestions", "destination-flag");
-  setupAirlineAutocomplete("airline-filter", "airline-suggestions");
+  setupAutocomplete({
+    inputId: "origin",
+    suggestionsId: "origin-suggestions",
+    flagId: "origin-flag",
+    fetchFn: (term) => window.ReferenceData.searchCities(term),
+    renderLabel: (item) =>
+      `<span class="suggestion-flag">${item.flag}</span> ${item.name}${
+        item.countryName ? `, ${item.countryName}` : ""
+      }`,
+    onSelect: (item, input, flagEl) => {
+      input.value = item.name;
+      input.dataset.code = item.code;
+      input.dataset.label = item.name;
+      if (flagEl) flagEl.textContent = item.flag;
+    },
+  });
+
+  setupAutocomplete({
+    inputId: "destination",
+    suggestionsId: "destination-suggestions",
+    flagId: "destination-flag",
+    fetchFn: (term) => window.ReferenceData.searchCities(term),
+    renderLabel: (item) =>
+      `<span class="suggestion-flag">${item.flag}</span> ${item.name}${
+        item.countryName ? `, ${item.countryName}` : ""
+      }`,
+    onSelect: (item, input, flagEl) => {
+      input.value = item.name;
+      input.dataset.code = item.code;
+      input.dataset.label = item.name;
+      if (flagEl) flagEl.textContent = item.flag;
+    },
+  });
+
+  setupAutocomplete({
+    inputId: "airline-filter",
+    suggestionsId: "airline-suggestions",
+    flagId: null,
+    fetchFn: (term) => window.ReferenceData.searchAirlines(term),
+    renderLabel: (item) => item.name,
+    onSelect: (item, input) => {
+      input.value = item.name;
+      input.dataset.code = item.code;
+    },
+  });
 
   // ---------- Форма поиска ----------
 

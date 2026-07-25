@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>членсосейлс</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="style.css" />
@@ -41,16 +41,18 @@
         <div class="field-row">
           <div class="field autocomplete-field">
             <label for="origin">Откуда</label>
-            <input type="text" id="origin" placeholder="Город вылета" autocomplete="off" required />
-            <span class="field-flag" id="origin-flag"></span>
-            <ul class="suggestions hidden" id="origin-suggestions"></ul>
+            <input type="text" id="origin" placeholder="Город вылета" autocomplete="off" required
+              role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="origin-suggestions" />
+            <span class="field-flag" id="origin-flag" aria-hidden="true"></span>
+            <ul class="suggestions hidden" id="origin-suggestions" role="listbox" aria-label="Варианты городов вылета"></ul>
           </div>
-          <button type="button" id="swap-btn" class="swap-btn" title="Поменять местами">⇄</button>
+          <button type="button" id="swap-btn" class="swap-btn" title="Поменять местами" aria-label="Поменять города местами">⇄</button>
           <div class="field autocomplete-field">
             <label for="destination">Куда</label>
-            <input type="text" id="destination" placeholder="Город назначения" autocomplete="off" required />
-            <span class="field-flag" id="destination-flag"></span>
-            <ul class="suggestions hidden" id="destination-suggestions"></ul>
+            <input type="text" id="destination" placeholder="Город назначения" autocomplete="off" required
+              role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="destination-suggestions" />
+            <span class="field-flag" id="destination-flag" aria-hidden="true"></span>
+            <ul class="suggestions hidden" id="destination-suggestions" role="listbox" aria-label="Варианты городов назначения"></ul>
           </div>
         </div>
 
@@ -74,8 +76,9 @@
 
           <div class="field autocomplete-field">
             <label for="airline-filter">Авиакомпания (необязательно)</label>
-            <input type="text" id="airline-filter" placeholder="напр. Qatar Airways" autocomplete="off" />
-            <ul class="suggestions hidden" id="airline-suggestions"></ul>
+            <input type="text" id="airline-filter" placeholder="напр. Qatar Airways" autocomplete="off"
+              role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="airline-suggestions" />
+            <ul class="suggestions hidden" id="airline-suggestions" role="listbox" aria-label="Варианты авиакомпаний"></ul>
           </div>
 
           <div class="field">
@@ -92,14 +95,14 @@
     </section>
 
     <!-- Экран загрузки -->
-    <section id="screen-loading" class="screen">
+    <section id="screen-loading" class="screen" aria-live="polite">
       <div class="spinner"></div>
       <p>Ищем лучшие цены…</p>
     </section>
 
     <!-- Экран ошибки -->
     <section id="screen-error" class="screen">
-      <p id="error-message">Что-то пошло не так.</p>
+      <p id="error-message" role="alert">Что-то пошло не так.</p>
       <div id="error-actions"></div>
     </section>
 
@@ -107,7 +110,7 @@
     <section id="screen-results" class="screen">
       <div class="results-header">
         <button type="button" id="back-btn" class="text-btn">← Новый поиск</button>
-        <span id="results-count"></span>
+        <span id="results-count" aria-live="polite"></span>
       </div>
       <ul id="results-list"></ul>
       <p id="results-empty" class="hidden">Билетов по этим фильтрам не нашлось. Попробуйте изменить даты или фильтры.</p>
