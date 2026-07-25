@@ -60,42 +60,40 @@ window.FlightAPI = (function () {
     (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   ];
 
-  // Пытается получить JSON напрямую; если браузер блокирует запрос (CORS) или
-  // реально нет сети - пробует по очереди несколько прокси. Различает типы
-  // ошибок, чтобы показать пользователю осмысленное сообщение, а не
-  // универсальное "нет интернета".
+  // Пытается получить JSON напрямую; если браузер блокирует запрос (CORS), сервер
+  // отвечает ошибкой (включая таймауты вроде 408) или реально нет сети - пробует
+  // по очереди несколько прокси. Останавливается сразу только на ошибке
+  // авторизации (401/403) - там повтор через другой путь всё равно не поможет,
+  // проблема в самом токене. Любая другая ошибка (таймаут, 5xx, обрыв сети) не
+  // прерывает цепочку - идём к следующему варианту.
   async function fetchJsonWithCorsFallback(url) {
-    let directFailed = false;
+    const attempts = [
+      () => fetch(url),
+      ...CORS_PROXIES.map((buildProxyUrl) => () => fetch(buildProxyUrl(url))),
+    ];
 
-    try {
-      const response = await fetch(url);
-      return await handleResponse(response);
-    } catch (err) {
-      if (err instanceof ApiError) throw err; // это уже осмысленная ошибка (401/500 и т.п.)
-      directFailed = true; // fetch() бросил TypeError - похоже на CORS или обрыв сети
-    }
+    let lastError = null;
 
-    for (const buildProxyUrl of CORS_PROXIES) {
+    for (const attempt of attempts) {
       try {
-        const response = await fetch(buildProxyUrl(url));
+        const response = await attempt();
         return await handleResponse(response);
-      } catch (proxyErr) {
-        if (proxyErr instanceof ApiError) throw proxyErr;
-        console.error("Прокси недоступен, пробуем следующий:", proxyErr);
-        // продолжаем к следующему прокси в списке
+      } catch (err) {
+        if (err instanceof ApiError && err.type === "auth") {
+          throw err; // неверный токен - другие пути не спасут, сообщаем сразу
+        }
+        lastError = err;
+        console.error("Попытка не удалась, пробуем следующий путь:", err);
       }
     }
 
-    // Все прокси по очереди провалились.
-    console.error(
-      "Прямой запрос и все прокси провалились. directFailed:",
-      directFailed
-    );
+    // Все пути (прямой + все прокси) по очереди провалились.
+    console.error("Все пути (прямой + все прокси) провалились.", lastError);
     throw new ApiError(
       "network",
-      "Не удалось связаться с сервером цен. Похоже, все доступные способы обхода " +
-        "блокировки браузера сейчас недоступны. Проверь интернет и попробуй снова " +
-        "через минуту - бесплатные прокси-сервисы иногда временно перегружены."
+      "Не удалось связаться с сервером цен ни напрямую, ни через резервные пути" +
+        (lastError && lastError.message ? ` (последняя ошибка: ${lastError.message})` : "") +
+        ". Проверь интернет и попробуй снова через минуту - бесплатные прокси-сервисы иногда временно перегружены."
     );
   }
 
