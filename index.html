@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>членсосейлс</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>членсосейлс</h1>
+  </header>
+
+  <main id="app">
+    <!-- Экран поиска -->
+    <section id="screen-search" class="screen active">
+      <form id="search-form">
+        <div class="field-row">
+          <div class="field">
+            <label for="origin">Откуда (код города)</label>
+            <input type="text" id="origin" placeholder="MOW" maxlength="3" autocomplete="off" required />
+          </div>
+          <button type="button" id="swap-btn" class="swap-btn" title="Поменять местами">⇄</button>
+          <div class="field">
+            <label for="destination">Куда (код города)</label>
+            <input type="text" id="destination" placeholder="BKK" maxlength="3" autocomplete="off" required />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="departure-date">Дата вылета</label>
+          <input type="date" id="departure-date" required />
+        </div>
+
+        <div class="field checkbox-field">
+          <input type="checkbox" id="flexible-dates" />
+          <label for="flexible-dates">Гибкие даты (±3 дня)</label>
+        </div>
+
+        <details class="filters-block">
+          <summary>Фильтры</summary>
+
+          <div class="field checkbox-field">
+            <input type="checkbox" id="direct-only" />
+            <label for="direct-only">Только прямые рейсы</label>
+          </div>
+
+          <div class="field">
+            <label for="airline-filter">Авиакомпания (код, необязательно)</label>
+            <input type="text" id="airline-filter" placeholder="напр. SU" maxlength="2" autocomplete="off" />
+          </div>
+
+          <div class="field">
+            <label for="sort-order">Сортировка</label>
+            <select id="sort-order">
+              <option value="price">Сначала дешёвые</option>
+              <option value="date">По дате вылета</option>
+            </select>
+          </div>
+        </details>
+
+        <button type="submit" id="search-btn" class="primary-btn">Найти билеты</button>
+      </form>
+    </section>
+
+    <!-- Экран загрузки -->
+    <section id="screen-loading" class="screen">
+      <div class="spinner"></div>
+      <p>Ищем лучшие цены…</p>
+    </section>
+
+    <!-- Экран ошибки -->
+    <section id="screen-error" class="screen">
+      <p id="error-message">Что-то пошло не так.</p>
+      <div id="error-actions"></div>
+    </section>
+
+    <!-- Экран результатов -->
+    <section id="screen-results" class="screen">
+      <div class="results-header">
+        <button type="button" id="back-btn" class="text-btn">← Новый поиск</button>
+        <span id="results-count"></span>
+      </div>
+      <ul id="results-list"></ul>
+      <p id="results-empty" class="hidden">Билетов по этим фильтрам не нашлось. Попробуйте изменить даты или фильтры.</p>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
