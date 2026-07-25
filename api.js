@@ -22,8 +22,9 @@ window.FlightAPI = (function () {
   // Один запрос к prices_for_dates на конкретную дату вылета.
   // Travelpayouts Data API не всегда отдаёт CORS-заголовки для прямых браузерных
   // запросов - если прямой fetch падает с сетевой ошибкой (что часто на самом деле
-  // означает блокировку CORS, а не реальное отсутствие интернета), пробуем ещё раз
-  // через публичный CORS-прокси allorigins.win.
+  // означает блокировку CORS, а не реальное отсутствие интернета), пробуем через
+  // несколько запасных CORS-прокси по очереди (один прокси может быть временно
+  // недоступен или перегружен - у бесплатных прокси нет гарантии аптайма).
   async function fetchForDate({ origin, destination, departureDate, directOnly }) {
     const params = new URLSearchParams({
       origin: origin.toUpperCase(),
@@ -49,9 +50,20 @@ window.FlightAPI = (function () {
     return Array.isArray(data.data) ? data.data : [];
   }
 
+  // Список запасных путей, если прямой запрос заблокирован браузером (CORS).
+  // Пробуем по очереди - если один прокси недоступен, идём к следующему.
+  // corsproxy.io отдельно поддерживает *.github.io в бесплатном тарифе, поэтому
+  // он первый в списке - должен штатно работать именно с нашим сайтом.
+  const CORS_PROXIES = [
+    (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+    (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ];
+
   // Пытается получить JSON напрямую; если браузер блокирует запрос (CORS) или
-  // реально нет сети - пробует через прокси. Различает типы ошибок, чтобы
-  // показать пользователю осмысленное сообщение, а не универсальное "нет интернета".
+  // реально нет сети - пробует по очереди несколько прокси. Различает типы
+  // ошибок, чтобы показать пользователю осмысленное сообщение, а не
+  // универсальное "нет интернета".
   async function fetchJsonWithCorsFallback(url) {
     let directFailed = false;
 
@@ -63,23 +75,28 @@ window.FlightAPI = (function () {
       directFailed = true; // fetch() бросил TypeError - похоже на CORS или обрыв сети
     }
 
-    // Запасной путь - через публичный CORS-прокси.
-    try {
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl);
-      return await handleResponse(response);
-    } catch (proxyErr) {
-      if (proxyErr instanceof ApiError) throw proxyErr;
-      // Оба пути упали - тут уже правда похоже на реальное отсутствие сети,
-      // либо прокси тоже недоступен.
-      console.error("Прямой запрос и запрос через прокси оба провалились:", proxyErr);
-      throw new ApiError(
-        "network",
-        directFailed
-          ? "Не удалось связаться с сервером цен (возможна блокировка запроса браузером). Проверь интернет; если он есть - открой консоль браузера (⋮ → Ещё инструменты → Инструменты разработчика) и посмотри, нет ли ошибки CORS."
-          : "Нет соединения с сервером. Проверь интернет и попробуй снова."
-      );
+    for (const buildProxyUrl of CORS_PROXIES) {
+      try {
+        const response = await fetch(buildProxyUrl(url));
+        return await handleResponse(response);
+      } catch (proxyErr) {
+        if (proxyErr instanceof ApiError) throw proxyErr;
+        console.error("Прокси недоступен, пробуем следующий:", proxyErr);
+        // продолжаем к следующему прокси в списке
+      }
     }
+
+    // Все прокси по очереди провалились.
+    console.error(
+      "Прямой запрос и все прокси провалились. directFailed:",
+      directFailed
+    );
+    throw new ApiError(
+      "network",
+      "Не удалось связаться с сервером цен. Похоже, все доступные способы обхода " +
+        "блокировки браузера сейчас недоступны. Проверь интернет и попробуй снова " +
+        "через минуту - бесплатные прокси-сервисы иногда временно перегружены."
+    );
   }
 
   async function handleResponse(response) {
