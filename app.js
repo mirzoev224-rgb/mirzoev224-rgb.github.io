@@ -17,8 +17,6 @@
     results: document.getElementById("screen-results"),
   };
 
-  let lastSearchParams = null;
-
   function showScreen(name) {
     Object.values(screens).forEach((el) => el.classList.remove("active"));
     screens[name].classList.add("active");
@@ -30,7 +28,7 @@
     return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" });
   }
 
-  function renderResults(tickets, origin, destination) {
+  function renderResults(tickets, originLabel, destinationLabel) {
     const list = document.getElementById("results-list");
     const empty = document.getElementById("results-empty");
     const count = document.getElementById("results-count");
@@ -57,7 +55,7 @@
 
       li.innerHTML = `
         <div class="ticket-route">
-          <span class="route">${origin.toUpperCase()} → ${destination.toUpperCase()}</span>
+          <span class="route">${originLabel} → ${destinationLabel}</span>
           <span class="price">${ticket.price} ${window.APP_CONFIG.CURRENCY.toUpperCase()}</span>
         </div>
         <div class="ticket-meta">
@@ -68,7 +66,11 @@
       `;
 
       li.addEventListener("click", () => {
-        const url = window.FlightAPI.buildBookingUrl(ticket, origin, destination);
+        const url = window.FlightAPI.buildBookingUrl(
+          ticket,
+          window.__lastSearch.originCode,
+          window.__lastSearch.destinationCode
+        );
         window.open(url, "_blank");
       });
 
@@ -99,12 +101,17 @@
     showScreen("error");
   }
 
+  window.__lastSearch = { originCode: "", destinationCode: "" };
+
   async function runSearch(params) {
-    lastSearchParams = params;
+    window.__lastSearch = {
+      originCode: params.origin,
+      destinationCode: params.destination,
+    };
     showScreen("loading");
     try {
       const tickets = await window.FlightAPI.search(params);
-      renderResults(tickets, params.origin, params.destination);
+      renderResults(tickets, params.originLabel, params.destinationLabel);
       showScreen("results");
     } catch (err) {
       const message =
@@ -113,34 +120,152 @@
     }
   }
 
+  // ---------- Автокомплит (города и авиакомпании) ----------
+
+  function debounce(fn, delay) {
+    let timer = null;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), delay);
+    };
+  }
+
+  function setupCityAutocomplete(inputId, suggestionsId, flagId) {
+    const input = document.getElementById(inputId);
+    const list = document.getElementById(suggestionsId);
+    const flagEl = flagId ? document.getElementById(flagId) : null;
+
+    input.dataset.code = "";
+
+    const runSearchDebounced = debounce(async (term) => {
+      const results = await window.ReferenceData.searchCities(term);
+      renderCitySuggestions(results);
+    }, 300);
+
+    function renderCitySuggestions(results) {
+      list.innerHTML = "";
+      if (!results.length) {
+        list.classList.add("hidden");
+        return;
+      }
+      results.forEach((item) => {
+        const li = document.createElement("li");
+        li.className = "suggestion-item";
+        li.innerHTML = `<span class="suggestion-flag">${item.flag}</span> ${item.name}${
+          item.countryName ? `, ${item.countryName}` : ""
+        }`;
+        li.addEventListener("click", () => {
+          input.value = item.name;
+          input.dataset.code = item.code;
+          input.dataset.label = item.name;
+          if (flagEl) flagEl.textContent = item.flag;
+          list.classList.add("hidden");
+        });
+        list.appendChild(li);
+      });
+      list.classList.remove("hidden");
+    }
+
+    input.addEventListener("input", () => {
+      input.dataset.code = "";
+      if (flagEl) flagEl.textContent = "";
+      const term = input.value;
+      if (term.trim().length < 2) {
+        list.classList.add("hidden");
+        return;
+      }
+      runSearchDebounced(term);
+    });
+
+    input.addEventListener("blur", () => {
+      // Небольшая задержка, чтобы клик по подсказке успел сработать до скрытия списка.
+      setTimeout(() => list.classList.add("hidden"), 150);
+    });
+  }
+
+  function setupAirlineAutocomplete(inputId, suggestionsId) {
+    const input = document.getElementById(inputId);
+    const list = document.getElementById(suggestionsId);
+
+    input.dataset.code = "";
+
+    const runSearchDebounced = debounce(async (term) => {
+      const results = await window.ReferenceData.searchAirlines(term);
+      renderAirlineSuggestions(results);
+    }, 300);
+
+    function renderAirlineSuggestions(results) {
+      list.innerHTML = "";
+      if (!results.length) {
+        list.classList.add("hidden");
+        return;
+      }
+      results.forEach((item) => {
+        const li = document.createElement("li");
+        li.className = "suggestion-item";
+        li.textContent = item.name;
+        li.addEventListener("click", () => {
+          input.value = item.name;
+          input.dataset.code = item.code;
+          list.classList.add("hidden");
+        });
+        list.appendChild(li);
+      });
+      list.classList.remove("hidden");
+    }
+
+    input.addEventListener("input", () => {
+      input.dataset.code = "";
+      const term = input.value;
+      if (term.trim().length < 2) {
+        list.classList.add("hidden");
+        return;
+      }
+      runSearchDebounced(term);
+    });
+
+    input.addEventListener("blur", () => {
+      setTimeout(() => list.classList.add("hidden"), 150);
+    });
+  }
+
+  setupCityAutocomplete("origin", "origin-suggestions", "origin-flag");
+  setupCityAutocomplete("destination", "destination-suggestions", "destination-flag");
+  setupAirlineAutocomplete("airline-filter", "airline-suggestions");
+
+  // ---------- Форма поиска ----------
+
   function readFormValues() {
-    const origin = document.getElementById("origin").value.trim();
-    const destination = document.getElementById("destination").value.trim();
+    const originInput = document.getElementById("origin");
+    const destinationInput = document.getElementById("destination");
+    const airlineInput = document.getElementById("airline-filter");
+
     const departureDate = document.getElementById("departure-date").value;
     const flexibleDates = document.getElementById("flexible-dates").checked;
     const directOnly = document.getElementById("direct-only").checked;
-    const airlineFilter = document.getElementById("airline-filter").value.trim();
     const sortOrder = document.getElementById("sort-order").value;
 
     return {
-      origin,
-      destination,
+      origin: originInput.dataset.code || "",
+      originLabel: originInput.value.trim(),
+      destination: destinationInput.dataset.code || "",
+      destinationLabel: destinationInput.value.trim(),
       departureDate,
       flexibleDates,
       directOnly,
-      airlineFilter,
+      airlineFilter: airlineInput.dataset.code || "",
       sortOrder,
     };
   }
 
   function validate(params) {
-    if (!/^[A-Za-z]{3}$/.test(params.origin)) {
-      return "Код города «откуда» должен состоять из 3 латинских букв (например, MOW).";
+    if (!params.origin) {
+      return "Выбери город вылета из списка подсказок.";
     }
-    if (!/^[A-Za-z]{3}$/.test(params.destination)) {
-      return "Код города «куда» должен состоять из 3 латинских букв (например, BKK).";
+    if (!params.destination) {
+      return "Выбери город назначения из списка подсказок.";
     }
-    if (params.origin.toUpperCase() === params.destination.toUpperCase()) {
+    if (params.origin === params.destination) {
       return "Пункт отправления и назначения не могут совпадать.";
     }
     if (!params.departureDate) {
@@ -168,9 +293,23 @@
   document.getElementById("swap-btn").addEventListener("click", () => {
     const origin = document.getElementById("origin");
     const destination = document.getElementById("destination");
-    const tmp = origin.value;
+    const originFlag = document.getElementById("origin-flag");
+    const destinationFlag = document.getElementById("destination-flag");
+
+    const tmpValue = origin.value;
+    const tmpCode = origin.dataset.code;
+    const tmpLabel = origin.dataset.label;
+    const tmpFlag = originFlag.textContent;
+
     origin.value = destination.value;
-    destination.value = tmp;
+    origin.dataset.code = destination.dataset.code;
+    origin.dataset.label = destination.dataset.label;
+    originFlag.textContent = destinationFlag.textContent;
+
+    destination.value = tmpValue;
+    destination.dataset.code = tmpCode;
+    destination.dataset.label = tmpLabel;
+    destinationFlag.textContent = tmpFlag;
   });
 
   document.getElementById("back-btn").addEventListener("click", () => {

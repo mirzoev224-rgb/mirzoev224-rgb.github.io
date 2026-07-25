@@ -8,6 +8,28 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- Фоновая вращающаяся Земля - чисто декоративная, за контентом -->
+  <div class="earth-bg" aria-hidden="true">
+    <svg viewBox="0 0 200 200" class="earth-svg">
+      <defs>
+        <clipPath id="globeClip">
+          <circle cx="100" cy="100" r="90" />
+        </clipPath>
+      </defs>
+      <circle cx="100" cy="100" r="90" class="earth-ocean" />
+      <g clip-path="url(#globeClip)" class="earth-spin">
+        <ellipse cx="55" cy="70" rx="28" ry="18" class="earth-land" />
+        <ellipse cx="115" cy="55" rx="20" ry="14" class="earth-land" />
+        <ellipse cx="150" cy="100" rx="16" ry="24" class="earth-land" />
+        <ellipse cx="70" cy="130" rx="24" ry="16" class="earth-land" />
+        <ellipse cx="130" cy="145" rx="18" ry="12" class="earth-land" />
+        <ellipse cx="20" cy="100" rx="14" ry="20" class="earth-land" />
+        <ellipse cx="185" cy="70" rx="12" ry="16" class="earth-land" />
+      </g>
+      <circle cx="100" cy="100" r="90" class="earth-outline" />
+    </svg>
+  </div>
+
   <header class="app-header">
     <h1>членсосейлс</h1>
   </header>
@@ -17,14 +39,18 @@
     <section id="screen-search" class="screen active">
       <form id="search-form">
         <div class="field-row">
-          <div class="field">
-            <label for="origin">Откуда (код города)</label>
-            <input type="text" id="origin" placeholder="MOW" maxlength="3" autocomplete="off" required />
+          <div class="field autocomplete-field">
+            <label for="origin">Откуда</label>
+            <input type="text" id="origin" placeholder="Город вылета" autocomplete="off" required />
+            <span class="field-flag" id="origin-flag"></span>
+            <ul class="suggestions hidden" id="origin-suggestions"></ul>
           </div>
           <button type="button" id="swap-btn" class="swap-btn" title="Поменять местами">⇄</button>
-          <div class="field">
-            <label for="destination">Куда (код города)</label>
-            <input type="text" id="destination" placeholder="BKK" maxlength="3" autocomplete="off" required />
+          <div class="field autocomplete-field">
+            <label for="destination">Куда</label>
+            <input type="text" id="destination" placeholder="Город назначения" autocomplete="off" required />
+            <span class="field-flag" id="destination-flag"></span>
+            <ul class="suggestions hidden" id="destination-suggestions"></ul>
           </div>
         </div>
 
@@ -46,9 +72,10 @@
             <label for="direct-only">Только прямые рейсы</label>
           </div>
 
-          <div class="field">
-            <label for="airline-filter">Авиакомпания (код, необязательно)</label>
-            <input type="text" id="airline-filter" placeholder="напр. SU" maxlength="2" autocomplete="off" />
+          <div class="field autocomplete-field">
+            <label for="airline-filter">Авиакомпания (необязательно)</label>
+            <input type="text" id="airline-filter" placeholder="напр. Qatar Airways" autocomplete="off" />
+            <ul class="suggestions hidden" id="airline-suggestions"></ul>
           </div>
 
           <div class="field">
@@ -88,6 +115,7 @@
   </main>
 
   <script src="config.js"></script>
+  <script src="reference-data.js"></script>
   <script src="api.js"></script>
   <script src="app.js"></script>
 </body>
