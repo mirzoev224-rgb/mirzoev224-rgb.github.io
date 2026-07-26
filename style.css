@@ -130,18 +130,17 @@ main {
 }
 
 .currency-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin: 4px 0 0;
+  position: fixed;
+  margin: 0;
   padding: 0;
   list-style: none;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   min-width: 170px;
-  z-index: 6;
+  z-index: 9999;
   overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .currency-dropdown li {

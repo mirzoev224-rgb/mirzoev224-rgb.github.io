@@ -164,6 +164,11 @@
   }
 
   function openCurrencyDropdown() {
+    // Т.к. дропдаун position:fixed (не зависит от родительских контекстов
+    // наложения), ставим его координаты вручную по положению кнопки на экране.
+    const rect = currencyBtn.getBoundingClientRect();
+    currencyDropdown.style.top = `${rect.bottom + 4}px`;
+    currencyDropdown.style.left = `${rect.left}px`;
     currencyDropdown.classList.remove("hidden");
     currencyBtn.setAttribute("aria-expanded", "true");
   }
@@ -202,6 +207,14 @@
       closeCurrencyDropdown();
     }
   });
+
+  window.addEventListener(
+    "scroll",
+    () => {
+      closeCurrencyDropdown();
+    },
+    { passive: true }
+  );
 
   applyCurrencyToUI(currentCurrency);
 
