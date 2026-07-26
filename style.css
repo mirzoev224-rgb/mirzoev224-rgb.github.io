@@ -95,6 +95,76 @@ main {
   font-weight: 600;
 }
 
+.currency-selector {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 10px;
+}
+
+.currency-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 10px;
+  min-height: 36px;
+  cursor: pointer;
+}
+
+.currency-btn:active {
+  background: var(--surface);
+}
+
+.currency-caret {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.currency-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-width: 170px;
+  z-index: 6;
+  overflow: hidden;
+}
+
+.currency-dropdown li {
+  padding: 10px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.currency-dropdown li:last-child {
+  border-bottom: none;
+}
+
+.currency-dropdown li:active,
+.currency-dropdown li:focus {
+  background: var(--surface);
+  outline: none;
+}
+
+.currency-dropdown li[aria-selected="true"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 main {
   padding: 16px;
   max-width: 480px;

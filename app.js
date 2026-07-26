@@ -61,7 +61,7 @@
       li.setAttribute("tabindex", "0");
       li.setAttribute(
         "aria-label",
-        `${originLabel} в ${destinationLabel}, ${ticket.price} ${window.APP_CONFIG.CURRENCY.toUpperCase()}, открыть для покупки`
+        `${originLabel} в ${destinationLabel}, ${ticket.price} ${currencySymbol()}, открыть для покупки`
       );
 
       const transferLabel =
@@ -72,7 +72,7 @@
       li.innerHTML = `
         <div class="ticket-route">
           <span class="route">${originLabel} → ${destinationLabel}</span>
-          <span class="price">${ticket.price} ${window.APP_CONFIG.CURRENCY.toUpperCase()}</span>
+          <span class="price">${ticket.price} ${currencySymbol()}</span>
         </div>
         <div class="ticket-meta">
           <span class="badge">${formatDate(ticket.departure_at)}</span>
@@ -117,8 +117,96 @@
   }
 
   window.__lastSearch = { originCode: "", destinationCode: "" };
+  window.__lastSearchParams = null;
+
+  // ---------- Выбор валюты ----------
+  const CURRENCIES = { rub: "₽", usd: "$", eur: "€", uah: "₴" };
+
+  function loadSavedCurrency() {
+    try {
+      const saved = window.localStorage.getItem("currency");
+      if (saved && CURRENCIES[saved]) return saved;
+    } catch (err) {
+      // localStorage недоступен (приватный режим и т.п.) - используем значение по умолчанию
+    }
+    return (window.APP_CONFIG && window.APP_CONFIG.CURRENCY) || "rub";
+  }
+
+  let currentCurrency = loadSavedCurrency();
+
+  const currencyBtn = document.getElementById("currency-btn");
+  const currencyBtnLabel = document.getElementById("currency-btn-label");
+  const currencyDropdown = document.getElementById("currency-dropdown");
+
+  function currencySymbol() {
+    return CURRENCIES[currentCurrency] || "";
+  }
+
+  function applyCurrencyToUI(code) {
+    currentCurrency = code;
+    currencyBtnLabel.textContent = `${currencySymbol()} ${code.toUpperCase()}`;
+    currencyDropdown.querySelectorAll("li").forEach((li) => {
+      li.setAttribute(
+        "aria-selected",
+        li.dataset.currency === code ? "true" : "false"
+      );
+    });
+    try {
+      window.localStorage.setItem("currency", code);
+    } catch (err) {
+      // Не критично, если сохранить не получилось
+    }
+  }
+
+  function closeCurrencyDropdown() {
+    currencyDropdown.classList.add("hidden");
+    currencyBtn.setAttribute("aria-expanded", "false");
+  }
+
+  function openCurrencyDropdown() {
+    currencyDropdown.classList.remove("hidden");
+    currencyBtn.setAttribute("aria-expanded", "true");
+  }
+
+  currencyBtn.addEventListener("click", () => {
+    const isOpen = !currencyDropdown.classList.contains("hidden");
+    if (isOpen) {
+      closeCurrencyDropdown();
+    } else {
+      openCurrencyDropdown();
+    }
+  });
+
+  function chooseCurrency(li) {
+    const code = li.dataset.currency;
+    applyCurrencyToUI(code);
+    closeCurrencyDropdown();
+    // Если результаты уже на экране - обновляем их сразу в новой валюте.
+    if (window.__lastSearchParams) {
+      runSearch({ ...window.__lastSearchParams, currency: code });
+    }
+  }
+
+  currencyDropdown.querySelectorAll("li").forEach((li) => {
+    li.addEventListener("click", () => chooseCurrency(li));
+    li.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        chooseCurrency(li);
+      }
+    });
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".currency-selector")) {
+      closeCurrencyDropdown();
+    }
+  });
+
+  applyCurrencyToUI(currentCurrency);
 
   async function runSearch(params) {
+    window.__lastSearchParams = params;
     window.__lastSearch = {
       originCode: params.origin,
       destinationCode: params.destination,
@@ -325,6 +413,7 @@
       directOnly,
       airlineFilter: airlineInput.dataset.code || "",
       sortOrder,
+      currency: currentCurrency,
     };
   }
 

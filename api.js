@@ -3,7 +3,7 @@
 // Документация: https://travelpayouts.github.io/slate/#prices_for_dates
 
 window.FlightAPI = (function () {
-  const { API_BASE, TRAVELPAYOUTS_TOKEN, CURRENCY } = window.APP_CONFIG;
+  const { API_BASE, TRAVELPAYOUTS_TOKEN } = window.APP_CONFIG;
 
   function toISODate(date) {
     const d = new Date(date);
@@ -25,14 +25,14 @@ window.FlightAPI = (function () {
   // означает блокировку CORS, а не реальное отсутствие интернета), пробуем через
   // несколько запасных CORS-прокси по очереди (один прокси может быть временно
   // недоступен или перегружен - у бесплатных прокси нет гарантии аптайма).
-  async function fetchForDate({ origin, destination, departureDate, directOnly }) {
+  async function fetchForDate({ origin, destination, departureDate, directOnly, currency }) {
     const params = new URLSearchParams({
       origin: origin.toUpperCase(),
       destination: destination.toUpperCase(),
       departure_at: departureDate,
       one_way: "true",
       direct: directOnly ? "true" : "false",
-      currency: CURRENCY,
+      currency: currency,
       sorting: "price",
       limit: "30",
       page: "1",
@@ -129,6 +129,7 @@ window.FlightAPI = (function () {
     directOnly,
     airlineFilter,
     sortOrder,
+    currency,
   }) {
     const baseDate = new Date(departureDate);
     const dateOffsets = flexibleDates ? [-3, -2, -1, 0, 1, 2, 3] : [0];
@@ -148,6 +149,7 @@ window.FlightAPI = (function () {
           destination,
           departureDate: date,
           directOnly,
+          currency,
         });
         results.push(...tickets);
       } catch (err) {
