@@ -12,7 +12,7 @@ window.APP_CONFIG = {
 
   // Валюта по умолчанию при первом открытии (дальше пользователь может
   // переключить её в приложении - выбор запоминается в браузере)
-  CURRENCY: "rub",
+  CURRENCY: "uah",
 
   // Базовый URL Data API
   API_BASE: "https://api.travelpayouts.com",

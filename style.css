@@ -79,7 +79,11 @@ body {
   }
 }
 
-.app-header,
+.app-header {
+  position: relative;
+  z-index: 10;
+}
+
 main {
   position: relative;
   z-index: 1;
