@@ -16,4 +16,8 @@ window.APP_CONFIG = {
 
   // Базовый URL Data API
   API_BASE: "https://api.travelpayouts.com",
+
+  // Ключ RapidAPI для compare-flight-prices.p.rapidapi.com (второй источник
+  // цен, сравнивает Kayak/Priceline/Expedia и другие агентства)
+  RAPIDAPI_KEY: "62eaef6b02msh92c9df16aa94393p1a47c8jsn065f6d211dad",
 };

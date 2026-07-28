@@ -303,6 +303,16 @@ button:focus-visible {
   margin-right: 6px;
 }
 
+.suggestion-airline-logo {
+  height: 20px;
+  width: auto;
+  max-width: 48px;
+  vertical-align: middle;
+  margin-right: 8px;
+  border-radius: 3px;
+  background: #fff;
+}
+
 .swap-btn {
   height: 46px;
   width: 44px;
@@ -523,6 +533,11 @@ button:focus-visible {
   background: var(--surface-2);
   border-radius: 6px;
   padding: 2px 8px;
+}
+
+.badge-source {
+  border: 1px solid var(--accent-dim);
+  color: var(--text-dim);
 }
 
 .empty-state {

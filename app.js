@@ -37,6 +37,24 @@
     window.open(url, "_blank");
   }
 
+  // Музыка на экране "билетов нема" - играет по кругу, пока экран виден.
+  const emptyStateAudio = document.getElementById("empty-state-audio");
+
+  function playEmptyStateAudio() {
+    if (!emptyStateAudio) return;
+    emptyStateAudio.currentTime = 0;
+    emptyStateAudio.play().catch(() => {
+      // Браузер может заблокировать автовоспроизведение - не критично,
+      // просто тихо ничего не играем в этом случае.
+    });
+  }
+
+  function stopEmptyStateAudio() {
+    if (!emptyStateAudio) return;
+    emptyStateAudio.pause();
+    emptyStateAudio.currentTime = 0;
+  }
+
   function renderResults(tickets, originLabel, destinationLabel) {
     const list = document.getElementById("results-list");
     const empty = document.getElementById("results-empty");
@@ -47,10 +65,12 @@
     if (!tickets.length) {
       empty.classList.remove("hidden");
       count.textContent = "";
+      playEmptyStateAudio();
       return;
     }
 
     empty.classList.add("hidden");
+    stopEmptyStateAudio();
     count.textContent = `Найдено: ${tickets.length}`;
 
     tickets.forEach((ticket) => {
@@ -67,6 +87,8 @@
       const transferLabel =
         ticket.transfers === 0
           ? "Прямой"
+          : ticket.transfers == null
+          ? null
           : `${ticket.transfers} пересадк${ticket.transfers === 1 ? "а" : "и"}`;
 
       li.innerHTML = `
@@ -75,9 +97,10 @@
           <span class="price">${ticket.price} ${currencySymbol()}</span>
         </div>
         <div class="ticket-meta">
-          <span class="badge">${formatDate(ticket.departure_at)}</span>
-          <span class="badge">${transferLabel}</span>
+          ${formatDate(ticket.departure_at) ? `<span class="badge">${formatDate(ticket.departure_at)}</span>` : ""}
+          ${transferLabel ? `<span class="badge">${transferLabel}</span>` : ""}
           ${ticket.airline ? `<span class="badge">${ticket.airline}</span>` : ""}
+          ${ticket.source ? `<span class="badge badge-source">${ticket.source}</span>` : ""}
         </div>
       `;
 
@@ -224,6 +247,7 @@
       originCode: params.origin,
       destinationCode: params.destination,
     };
+    stopEmptyStateAudio();
     showScreen("loading");
     try {
       const tickets = await window.FlightAPI.search(params);
@@ -249,7 +273,15 @@
     };
   }
 
-  function setupAutocomplete({ inputId, suggestionsId, flagId, fetchFn, renderLabel, onSelect }) {
+  function setupAutocomplete({
+    inputId,
+    suggestionsId,
+    flagId,
+    fetchFn,
+    renderLabel,
+    onSelect,
+    defaultResultsFn,
+  }) {
     const input = document.getElementById(inputId);
     const list = document.getElementById(suggestionsId);
     const flagEl = flagId ? document.getElementById(flagId) : null;
@@ -352,6 +384,13 @@
       }
     });
 
+    input.addEventListener("focus", () => {
+      if (input.value.trim().length > 0) return; // уже что-то напечатано - не мешаем
+      if (!defaultResultsFn) return;
+      const results = defaultResultsFn();
+      renderSuggestions(results);
+    });
+
     input.addEventListener("blur", () => {
       // Небольшая задержка не нужна: выбор идёт через mousedown (срабатывает раньше blur).
       closeList();
@@ -397,7 +436,9 @@
     suggestionsId: "airline-suggestions",
     flagId: null,
     fetchFn: (term) => window.ReferenceData.searchAirlines(term),
-    renderLabel: (item) => item.name,
+    defaultResultsFn: () => window.ReferenceData.getPopularAirlines(),
+    renderLabel: (item) =>
+      `<img src="${item.logo}" alt="" class="suggestion-airline-logo" loading="lazy" onerror="this.style.visibility='hidden'" /> ${item.name}`,
     onSelect: (item, input) => {
       input.value = item.name;
       input.dataset.code = item.code;
@@ -415,6 +456,10 @@
     const flexibleDates = document.getElementById("flexible-dates").checked;
     const directOnly = document.getElementById("direct-only").checked;
     const sortOrder = document.getElementById("sort-order").value;
+    const adults = Number(document.getElementById("passengers").value) || 1;
+    const cabin = document.getElementById("cabin-class").value;
+    const tripType = document.getElementById("trip-type").value;
+    const returnDate = document.getElementById("return-date").value;
 
     return {
       origin: originInput.dataset.code || "",
@@ -427,8 +472,23 @@
       airlineFilter: airlineInput.dataset.code || "",
       sortOrder,
       currency: currentCurrency,
+      adults,
+      cabin,
+      tripType,
+      returnDate,
     };
   }
+
+  document.getElementById("trip-type").addEventListener("change", (e) => {
+    const returnDateField = document.getElementById("return-date-field");
+    if (e.target.value === "2") {
+      returnDateField.classList.remove("hidden");
+      document.getElementById("return-date").required = true;
+    } else {
+      returnDateField.classList.add("hidden");
+      document.getElementById("return-date").required = false;
+    }
+  });
 
   function validate(params) {
     if (!params.origin) {
@@ -436,6 +496,9 @@
     }
     if (!params.destination) {
       return "Выбери город назначения из списка подсказок.";
+    }
+    if (params.tripType === "2" && !params.returnDate) {
+      return "Укажи дату обратно (выбран тип рейса «Туда-обратно»).";
     }
     if (params.origin === params.destination) {
       return "Пункт отправления и назначения не могут совпадать.";
@@ -485,6 +548,7 @@
   });
 
   document.getElementById("back-btn").addEventListener("click", () => {
+    stopEmptyStateAudio();
     showScreen("search");
   });
 

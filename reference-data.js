@@ -92,6 +92,29 @@ window.ReferenceData = (function () {
     return airlinesLoadingPromise;
   }
 
+  // Логотип авиакомпании - официальный бесплатный сервис Aviasales/Travelpayouts,
+  // не требует токена: https://pics.avs.io/{ширина}/{высота}/{IATA}.png
+  function airlineLogoUrl(iataCode) {
+    return `https://pics.avs.io/110/40/${iataCode}.png`;
+  }
+
+  // 5 самых известных авиакомпаний - показываются по умолчанию при фокусе на
+  // поле, ещё до того как человек начал печатать.
+  const POPULAR_AIRLINES = [
+    { code: "SU", name: "Аэрофлот" },
+    { code: "TK", name: "Turkish Airlines" },
+    { code: "EK", name: "Emirates" },
+    { code: "QR", name: "Qatar Airways" },
+    { code: "LH", name: "Lufthansa" },
+  ];
+
+  function getPopularAirlines() {
+    return POPULAR_AIRLINES.map((a) => ({
+      ...a,
+      logo: airlineLogoUrl(a.code),
+    }));
+  }
+
   async function searchAirlines(term) {
     if (!term || term.trim().length < 2) return [];
     const list = await loadAirlines();
@@ -99,8 +122,15 @@ window.ReferenceData = (function () {
     return list
       .filter((a) => a.name.toLowerCase().includes(q))
       .slice(0, 8)
-      .map((a) => ({ code: a.iata, name: a.name }));
+      .map((a) => ({ code: a.iata, name: a.name, logo: airlineLogoUrl(a.iata) }));
   }
 
-  return { searchCities, searchAirlines, countryCodeToFlag, loadAirlines };
+  return {
+    searchCities,
+    searchAirlines,
+    countryCodeToFlag,
+    loadAirlines,
+    getPopularAirlines,
+    airlineLogoUrl,
+  };
 })();
