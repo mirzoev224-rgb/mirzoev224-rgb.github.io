@@ -244,6 +244,53 @@ select {
   padding-right: 36px;
 }
 
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.stepper-btn {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  background: var(--surface-2);
+  border: none;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stepper-btn:active {
+  background: var(--border);
+}
+
+.stepper input[type="number"] {
+  width: 48px;
+  text-align: center;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  padding: 0;
+  /* убираем нативные стрелки - управление только через кнопки степпера */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.stepper input[type="number"]::-webkit-inner-spin-button,
+.stepper input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .field-flag {
   position: absolute;
   right: 10px;
