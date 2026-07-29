@@ -18,27 +18,36 @@ window.ReferenceData = (function () {
     );
   }
 
+  // Список запасных путей, если прямой запрос заблокирован браузером (CORS) -
+  // тот же набор, что уже проверен в api.js. Один бесплатный прокси может быть
+  // временно недоступен, поэтому пробуем несколько по очереди.
+  const CORS_PROXIES = [
+    (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+    (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ];
+
   // Пытается получить JSON напрямую; если браузер блокирует запрос (CORS) -
-  // пробует через публичный прокси allorigins.win. Логирует в консоль, чтобы
-  // при отладке было видно, что именно произошло.
+  // пробует по очереди несколько прокси. Логирует в консоль, чтобы при
+  // отладке было видно, что именно произошло.
   async function fetchJsonWithCorsFallback(url, label) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) return null;
-      return await response.json();
-    } catch (err) {
-      console.warn(`[${label}] прямой запрос не прошёл (похоже на CORS), пробую через прокси`, err);
+    const attempts = [
+      () => fetch(url),
+      ...CORS_PROXIES.map((buildProxyUrl) => () => fetch(buildProxyUrl(url))),
+    ];
+
+    for (const attempt of attempts) {
+      try {
+        const response = await attempt();
+        if (!response.ok) continue;
+        return await response.json();
+      } catch (err) {
+        console.warn(`[${label}] один из путей не сработал, пробую следующий`, err);
+      }
     }
 
-    try {
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl);
-      if (!response.ok) return null;
-      return await response.json();
-    } catch (proxyErr) {
-      console.error(`[${label}] и прокси тоже не сработал`, proxyErr);
-      return null;
-    }
+    console.error(`[${label}] все пути (прямой + все прокси) провалились`);
+    return null;
   }
 
   // Поиск городов по названию (любой язык, любая часть слова).
@@ -82,10 +91,12 @@ window.ReferenceData = (function () {
 
     airlinesLoadingPromise = fetchJsonWithCorsFallback(AIRLINES_URL, "справочник авиакомпаний").then(
       (list) => {
-        airlinesCache = Array.isArray(list)
-          ? list.filter((a) => a.iata && a.name)
-          : [];
-        return airlinesCache;
+        const parsed = Array.isArray(list) ? list.filter((a) => a.iata && a.name) : [];
+        airlinesLoadingPromise = null;
+        if (parsed.length > 0) {
+          airlinesCache = parsed; // кэшируем только реальный успех
+        }
+        return parsed;
       }
     );
 
@@ -101,11 +112,11 @@ window.ReferenceData = (function () {
   // 5 самых известных авиакомпаний - показываются по умолчанию при фокусе на
   // поле, ещё до того как человек начал печатать.
   const POPULAR_AIRLINES = [
-    { code: "SU", name: "Аэрофлот" },
     { code: "TK", name: "Turkish Airlines" },
     { code: "EK", name: "Emirates" },
     { code: "QR", name: "Qatar Airways" },
     { code: "LH", name: "Lufthansa" },
+    { code: "BA", name: "British Airways" },
   ];
 
   function getPopularAirlines() {

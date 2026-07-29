@@ -115,14 +115,14 @@
               <option value="date">По дате вылета</option>
             </select>
           </div>
-        </details>
-
-        <details class="filters-block">
-          <summary>Доп. параметры для сравнения цен</summary>
 
           <div class="field">
-            <label for="passengers">Пассажиры (взрослые)</label>
-            <input type="number" id="passengers" min="1" max="9" value="1" />
+            <label id="passengers-label">Пассажиры (взрослые)</label>
+            <div class="stepper" role="group" aria-labelledby="passengers-label">
+              <button type="button" class="stepper-btn" id="passengers-decrement" aria-label="Уменьшить количество пассажиров">−</button>
+              <input type="number" id="passengers" min="1" max="9" value="1" readonly inputmode="numeric" aria-live="polite" />
+              <button type="button" class="stepper-btn" id="passengers-increment" aria-label="Увеличить количество пассажиров">+</button>
+            </div>
           </div>
 
           <div class="field">

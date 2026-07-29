@@ -490,6 +490,24 @@
     }
   });
 
+  (function setupPassengerStepper() {
+    const input = document.getElementById("passengers");
+    const min = Number(input.min) || 1;
+    const max = Number(input.max) || 9;
+
+    function setValue(next) {
+      input.value = String(Math.min(max, Math.max(min, next)));
+    }
+
+    document.getElementById("passengers-decrement").addEventListener("click", () => {
+      setValue(Number(input.value) - 1);
+    });
+
+    document.getElementById("passengers-increment").addEventListener("click", () => {
+      setValue(Number(input.value) + 1);
+    });
+  })();
+
   function validate(params) {
     if (!params.origin) {
       return "Выбери город вылета из списка подсказок.";
